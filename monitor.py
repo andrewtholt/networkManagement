@@ -13,9 +13,6 @@ conn = sqlite3.connect('node.db')
 
 c = conn.cursor()
 
-cmd= "fing --silent 192.168.10.0/24 -o log,csv"
-
-cmdList = cmd.split(" ")
 
 workQueue=queue.Queue(10)
 
@@ -57,12 +54,15 @@ class myThread (threading.Thread):
       print ("Exiting " + self.name)
 
 
-def main():
+def main(subNet):
     global exitFlag
     signal.signal(signal.SIGINT, handler)
 
     thread = myThread(1,"TEST", workQueue)
     thread.start()
+
+    cmd= "fing --silent " + subNet + "/24 -o log,csv"
+    cmdList = cmd.split(" ")
 
     tst = subprocess.Popen(cmdList, universal_newlines=True,stdout=subprocess.PIPE)
     while not exitFlag:
@@ -133,6 +133,10 @@ def main():
                             workQueue.put("STATE:" + ip_address + ":" + state )
             
             
-            
-main()
+if len(sys.argv) == 2:
+    print(sys.argv[1])
+    main(sys.argv[1])
+else:
+    print("Usage: monitor.py <subnet address>")
+
 
