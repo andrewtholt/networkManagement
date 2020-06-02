@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 
 import subprocess
 import sqlite3
@@ -9,6 +9,8 @@ import datetime
 import queue
 import signal
 import os
+import socket
+from ping3 import ping
 
 import paho.mqtt.client as mqtt
 
@@ -16,13 +18,43 @@ conn = sqlite3.connect('node.db')
 
 c = conn.cursor()
 
-
 workQueue=queue.Queue(10)
 
 exitFlag = False
 queueLock = threading.Lock()
 
 connected = False
+
+def checkNode(ip,port):
+
+    print("CHECKING",ip,port)
+
+    state = "down"
+
+    fail=True
+
+    if port != 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect((ip, port))
+                state = "up"
+                fail = False
+                state = "up"
+            except:
+                state = "down"
+    
+                fail = True
+
+    if fail:
+        res = ping(ip,timeout=1)
+        res = ping(ip,timeout=2)
+
+        if res == None:
+            state = 'down'
+        else:
+            state = 'up'
+
+    return state
 
 def handler(signum, frame):
     global exitFlag
@@ -40,8 +72,10 @@ def process_data(threadName, q):
     mqttBroker = "192.168.10.124"
     mqttPort = 1883
 
+    count=1
+
     while not exitFlag:
-        print("Process")
+#        print("Process")
         queueLock.acquire()
         if not workQueue.empty():
             print("Process In")
@@ -81,7 +115,6 @@ def process_data(threadName, q):
             topic += "/"
 
             # TODO command line flag to make payload JSON
-            # TODO If state is 'down' check by some other means (ping etc)
 
             mqttClient.publish(topic + 'event_time',payload='{0:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
             mqttClient.publish(topic + 'cause',payload=cause)
@@ -146,7 +179,7 @@ def main(subNet):
     #        print("mac_address:" + mac_address)
     #        print("maker      :" + maker)
 
-            sqlCmd = 'select count(*),state,notify from node where ip_address = "'+ ip_address + '";'
+            sqlCmd = 'select count(*),state,notify,checkport from node where ip_address = "'+ ip_address + '";'
 
         #    print(sqlCmd)
 
@@ -155,6 +188,7 @@ def main(subNet):
                 resultCount=res[0]
                 resultState=res[1]
                 resultNotify=res[2]
+                checkport = res[3]
 
                 ticks = time.time()
 
@@ -175,19 +209,31 @@ def main(subNet):
                     workQueue.put(dataOut)
                 else:
                     print("Match, check state")
+
+                    print("oldState      ", resultState)
+                    print("new State     ", state)
+
                     if resultState == state:
                         print("No Change in state")
                     else:
-                        print("State change, alert and update db")
+                        # TODO If state is 'down' check by some other means (ping etc)
 
-                        sqlCmd = "update node set state = '" + state + "',event_time =" + str(int(ticks)) + " where ip_address='" + ip_address + "';"
-                        print(sqlCmd)
-                        c.execute(sqlCmd)
-                        conn.commit()
+                        state = checkNode(ip_address,checkport)
 
-                        if resultNotify == "YES":
-                            dataOut = "STATE:" + ip_address + ":" + name +":" + state 
-                            workQueue.put(dataOut)
+                        print("Checked State ", state)
+#                        if state == 'down':
+                        if resultState != state:
+
+                            print("State change, alert and update db")
+    
+                            sqlCmd = "update node set state = '" + state + "',event_time =" + str(int(ticks)) + " where ip_address='" + ip_address + "';"
+                            print(sqlCmd)
+                            c.execute(sqlCmd)
+                            conn.commit()
+    
+                            if resultNotify == "YES":
+                                dataOut = "STATE:" + ip_address + ":" + name +":" + state 
+                                workQueue.put(dataOut)
 
 
 if len(sys.argv) == 2:

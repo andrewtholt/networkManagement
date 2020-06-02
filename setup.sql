@@ -7,6 +7,7 @@ CREATE TABLE node (
     mac_address varchar(32),
     maker varchar(32),
     notify varchar(4) default "YES" NOT NULL,
+    checkport integer default 0,
     event_time integer
 );
 
