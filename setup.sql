@@ -1,7 +1,4 @@
-
-drop table if exists node;
-
-create table node (
+CREATE TABLE node (
     time_stamp varchar(32),
     state varchar(8),
     ip_address varchar(32) NOT NULL UNIQUE,
@@ -9,7 +6,7 @@ create table node (
     name varchar(32),
     mac_address varchar(32),
     maker varchar(32),
-    notify varchar(4) default "YES" NOT NULL
+    notify varchar(4) default "YES" NOT NULL,
+    event_time integer
 );
-
 
