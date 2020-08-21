@@ -148,12 +148,12 @@ def main(subNet):
     thread.start()
 
     cmd= "fing --silent " + subNet + "/24 -o log,csv"
+#    print( cmd )
     cmdList = cmd.split(" ")
 
     tst = subprocess.Popen(cmdList, universal_newlines=True,stdout=subprocess.PIPE)
     while not exitFlag:
         output = tst.stdout.readline()
-        print(output)
         fred = output.splitlines()
 
     #    print(fred)
