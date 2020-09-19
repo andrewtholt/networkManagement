@@ -116,6 +116,9 @@ def process_data(threadName, q):
 
             # TODO command line flag to make payload JSON
 
+            print( "Cause:" + topic + 'cause:' + cause )
+            print( "State:" + topic + 'state:' + state )
+
             mqttClient.publish(topic + 'event_time',payload='{0:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
             mqttClient.publish(topic + 'cause',payload=cause)
             mqttClient.publish(topic + 'state',payload=state)
@@ -148,12 +151,12 @@ def main(subNet):
     thread.start()
 
     cmd= "fing --silent " + subNet + "/24 -o log,csv"
+#    print( cmd )
     cmdList = cmd.split(" ")
 
     tst = subprocess.Popen(cmdList, universal_newlines=True,stdout=subprocess.PIPE)
     while not exitFlag:
         output = tst.stdout.readline()
-        print(output)
         fred = output.splitlines()
 
     #    print(fred)
@@ -226,7 +229,8 @@ def main(subNet):
 
                             print("State change, alert and update db")
     
-                            sqlCmd = "update node set state = '" + state + "',event_time =" + str(int(ticks)) + " where ip_address='" + ip_address + "';"
+
+                            sqlCmd = "update node set state = '" + state + "',time_stamp='" + time_stamp + "',event_time =" + str(int(ticks)) + " where ip_address='" + ip_address + "';"
                             print(sqlCmd)
                             c.execute(sqlCmd)
                             conn.commit()
