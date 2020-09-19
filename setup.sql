@@ -7,7 +7,10 @@ CREATE TABLE node (
     mac_address varchar(32),
     maker varchar(32),
     notify varchar(4) default "YES" NOT NULL,
-    checkport integer default 0,
+    -- checkport: connect to this port to verify up, ignore if 0
+    check_port integer default 0,
+    -- If tru connect via monit to verify.
+    check_monit integer default false,
     event_time integer
 );
 
