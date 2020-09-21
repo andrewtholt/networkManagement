@@ -39,7 +39,6 @@ def checkNode(ip,port):
                 s.connect((ip, port))
                 state = "up"
                 fail = False
-                state = "up"
             except:
                 state = "down"
     
