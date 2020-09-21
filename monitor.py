@@ -11,6 +11,7 @@ import signal
 import os
 import socket
 from ping3 import ping
+import getopt
 
 import paho.mqtt.client as mqtt
 
@@ -24,10 +25,15 @@ exitFlag = False
 queueLock = threading.Lock()
 
 connected = False
+verbose = False
+
+def usage():
+    print("Usage: monitor.py -h | -v -s <subnet address")
 
 def checkNode(ip,port):
 
-    print("CHECKING",ip,port)
+    if verbose:
+        print("CHECKING",ip,port)
 
     state = "down"
 
@@ -57,14 +63,15 @@ def checkNode(ip,port):
 
 def handler(signum, frame):
     global exitFlag
-    print('Signal handler called with signal', signum)
+#    print('Signal handler called with signal', signum)
     exitFlag=True
 
 # tst = subprocess.run(["ls","-ltr"], universal_newlines=True,stdout=subprocess.PIPE)
 def on_connect(client, userdata, flags, rc):
     global connected
     connected=True
-    print("Connected")
+    if verbose:
+        print("MQTT Connected")
 
 def process_data(threadName, q):
     global exitFlag
@@ -74,17 +81,17 @@ def process_data(threadName, q):
     count=1
 
     while not exitFlag:
-#        print("Process")
+
         queueLock.acquire()
         if not workQueue.empty():
-            print("Process In")
+#            print("Process In")
             data = q.get()
 
             queueLock.release()
-            print ("%s processing %s" % (threadName, data))
+#            print ("%s processing %s" % (threadName, data))
 
             stuff = data.split(':')
-            print(stuff)
+#            print(stuff)
 
             cause      = stuff[0]
             ip_address = stuff[1]
@@ -94,14 +101,17 @@ def process_data(threadName, q):
             mqttClient = mqtt.Client()
             mqttClient.on_connect = on_connect
 
-            print("MQTT connecting ...")
+            if verbose:
+                print("MQTT connecting ...")
             mqttClient.connect(mqttBroker, mqttPort, 60)
 
             while not connected:
                 print("Waiting ....")
                 time.sleep(0.1)
                 mqttClient.loop()
-            print("MQTT connected ")
+
+            if verbose:
+                print("MQTT connected ")
 
             topic = "/test/monitor/"
 
@@ -115,14 +125,16 @@ def process_data(threadName, q):
 
             # TODO command line flag to make payload JSON
 
-            print( "Cause:" + topic + 'cause:' + cause )
-            print( "State:" + topic + 'state:' + state )
+            if verbose:
+                print( "Cause:" + topic + 'cause:' + cause )
+                print( "State:" + topic + 'state:' + state )
 
             mqttClient.publish(topic + 'event_time',payload='{0:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
             mqttClient.publish(topic + 'cause',payload=cause)
             mqttClient.publish(topic + 'state',payload=state)
 
-            print("MQTT disconnecting")
+            if verbose:
+                print("MQTT disconnecting")
             mqttClient.disconnect()
         else:
             queueLock.release()
@@ -136,13 +148,17 @@ class myThread (threading.Thread):
       self.name = name
       self.q = q
     def run(self):
-      print ("Starting " + self.name)
+      if verbose:
+        print ("Thread Starting " + self.name)
       process_data(self.name, self.q)
 
-      print ("Exiting " + self.name)
+      if verbose:
+        print ("Thread exiting " + self.name)
 
 
 def main(subNet):
+
+    print("Verbose",verbose)
     global exitFlag
     signal.signal(signal.SIGINT, handler)
 
@@ -150,7 +166,6 @@ def main(subNet):
     thread.start()
 
     cmd= "fing --silent " + subNet + "/24 -o log,csv"
-#    print( cmd )
     cmdList = cmd.split(" ")
 
     tst = subprocess.Popen(cmdList, universal_newlines=True,stdout=subprocess.PIPE)
@@ -158,11 +173,7 @@ def main(subNet):
         output = tst.stdout.readline()
         fred = output.splitlines()
 
-    #    print(fred)
-
         for data in fred:
-            #        print(data)
-
             dataList = data.split(";")
 
             time_stamp = dataList[0]
@@ -186,7 +197,6 @@ def main(subNet):
         #    print(sqlCmd)
 
             for res in c.execute( sqlCmd ):
-                #        print(res)
                 resultCount=res[0]
                 resultState=res[1]
                 resultNotify=res[2]
@@ -195,14 +205,16 @@ def main(subNet):
                 ticks = time.time()
 
                 if resultCount == 0:
-                    print("No match, insert and alert")
+                    if verbose:
+                        print("No match, insert and alert")
                     sqlCmd = 'insert into node '
                     sqlCmd += '(time_stamp,state,ip_address,unknown,name,mac_address,maker,event_time) '
                     sqlCmd += "values('" + time_stamp + "','" + state + "','"  + ip_address 
                     sqlCmd += "','" + unknown + "','" + name + "','"  + mac_address
                     sqlCmd += "','" + maker + "'," + str(int(ticks)) + ");"
 
-                    print(sqlCmd)
+                    if verbose:
+                        print(sqlCmd)
 
                     c.execute(sqlCmd)
                     conn.commit()
@@ -210,27 +222,33 @@ def main(subNet):
                     dataOut = "NEW:" + ip_address + ":" + name +":" + state 
                     workQueue.put(dataOut)
                 else:
-                    print("Match, check state")
+                    if verbose:
+                        print("Match, check state")
 
-                    print("oldState      ", resultState)
-                    print("new State     ", state)
+                        print("oldState      ", resultState)
+                        print("new State     ", state)
 
                     if resultState == state:
-                        print("No Change in state")
+                        if verbose:
+                            print("No Change in state")
                     else:
                         # TODO If state is 'down' check by some other means (ping etc)
 
                         state = checkNode(ip_address,checkport)
 
-                        print("Checked State ", state)
-#                        if state == 'down':
+                        if verbose:
+                            print("Checked State ", state)
+
                         if resultState != state:
 
-                            print("State change, alert and update db")
+                            if verbose:
+                                print("State change, alert and update db")
     
 
                             sqlCmd = "update node set state = '" + state + "',time_stamp='" + time_stamp + "',event_time =" + str(int(ticks)) + " where ip_address='" + ip_address + "';"
-                            print(sqlCmd)
+
+                            if verbose:
+                                print(sqlCmd)
                             c.execute(sqlCmd)
                             conn.commit()
     
@@ -238,11 +256,27 @@ def main(subNet):
                                 dataOut = "STATE:" + ip_address + ":" + name +":" + state 
                                 workQueue.put(dataOut)
 
+def start():
+    global verbose
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hs:v")
+    except getopt.GetoptError as err:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
 
-if len(sys.argv) == 2:
-    print(sys.argv[1])
-    main(sys.argv[1])
-else:
-    print("Usage: monitor.py <subnet address>")
+    for o, a in opts:
+        if o == '-h':
+            usage()
+            sys.exit(2)
+        elif o== '-s':
+            subNet = a
+        elif o == '-v':
+            print("Verbose")
 
+#    print(sys.argv[1])
+
+    main( subNet )
+
+start()
 
