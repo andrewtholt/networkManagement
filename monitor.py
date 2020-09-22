@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3.6
 
 import subprocess
 import sqlite3
@@ -15,9 +15,9 @@ import getopt
 
 import paho.mqtt.client as mqtt
 
-conn = sqlite3.connect('node.db')
+conn = None
+cursor = None
 
-c = conn.cursor()
 
 workQueue=queue.Queue(10)
 
@@ -28,7 +28,7 @@ connected = False
 verbose = False
 
 def usage():
-    print("Usage: monitor.py -h | -v -s <subnet address")
+    print("Usage: monitor.py -h | -d <path to db> -v -s <subnet address>")
 
 def checkNode(ip,port):
 
@@ -197,7 +197,7 @@ def main(subNet):
 
         #    print(sqlCmd)
 
-            for res in c.execute( sqlCmd ):
+            for res in cursor.execute( sqlCmd ):
                 resultCount=res[0]
                 resultState=res[1]
                 resultNotify=res[2]
@@ -217,7 +217,7 @@ def main(subNet):
                     if verbose:
                         print(sqlCmd)
 
-                    c.execute(sqlCmd)
+                    cursor.execute(sqlCmd)
                     conn.commit()
 
                     dataOut = "NEW:" + ip_address + ":" + name +":" + state 
@@ -250,7 +250,7 @@ def main(subNet):
 
                             if verbose:
                                 print(sqlCmd)
-                            c.execute(sqlCmd)
+                            cursor.execute(sqlCmd)
                             conn.commit()
     
 #                            print("NOTIFY")
@@ -261,15 +261,22 @@ def main(subNet):
 
 def start():
     global verbose
+    global conn
+    global cursor 
+
+    dbPath = "./"
+
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hs:v")
+        opts, args = getopt.getopt(sys.argv[1:], "d:hs:v")
     except getopt.GetoptError as err:
         print(err)  # will print something like "option -a not recognized"
         usage()
         sys.exit(2)
 
     for o, a in opts:
-        if o == '-h':
+        if o == '-d':
+            dbPath = a
+        elif o == '-h':
             usage()
             sys.exit(2)
         elif o== '-s':
@@ -278,6 +285,12 @@ def start():
             print("Verbose")
 
 #    print(sys.argv[1])
+    dbName = dbPath + 'node.db'
+    print("Open db " + dbName)
+
+#    conn = sqlite3.connect('node.db')
+    conn = sqlite3.connect(dbName)
+    cursor = conn.cursor()
 
     main( subNet )
 
