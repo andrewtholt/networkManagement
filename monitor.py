@@ -106,7 +106,8 @@ def process_data(threadName, q):
             mqttClient.connect(mqttBroker, mqttPort, 60)
 
             while not connected:
-                print("Waiting ....")
+                if verbose:
+                    print("Waiting ....")
                 time.sleep(0.1)
                 mqttClient.loop()
 
@@ -252,8 +253,10 @@ def main(subNet):
                             c.execute(sqlCmd)
                             conn.commit()
     
+#                            print("NOTIFY")
                             if resultNotify == "YES":
                                 dataOut = "STATE:" + ip_address + ":" + name +":" + state 
+#                                print("... " + dataOut)
                                 workQueue.put(dataOut)
 
 def start():
