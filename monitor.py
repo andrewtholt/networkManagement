@@ -25,13 +25,14 @@ exitFlag = False
 queueLock = threading.Lock()
 
 connected = False
-verbose = False
+verbose =  True
 
 def usage():
     print("Usage: monitor.py -h | -d <path to db> -v -s <subnet address>")
 
 def checkNode(ip,port):
 
+    global verbose
     if verbose:
         print("CHECKING",ip,port)
 
@@ -68,6 +69,7 @@ def handler(signum, frame):
 
 # tst = subprocess.run(["ls","-ltr"], universal_newlines=True,stdout=subprocess.PIPE)
 def on_connect(client, userdata, flags, rc):
+    global verbose
     global connected
     connected=True
     if verbose:
@@ -75,6 +77,7 @@ def on_connect(client, userdata, flags, rc):
 
 def process_data(threadName, q):
     global exitFlag
+    global verbose
     mqttBroker = "192.168.10.124"
     mqttPort = 1883
 
@@ -149,6 +152,7 @@ class myThread (threading.Thread):
       self.name = name
       self.q = q
     def run(self):
+      global verbose
       if verbose:
         print ("Thread Starting " + self.name)
       process_data(self.name, self.q)
@@ -159,6 +163,7 @@ class myThread (threading.Thread):
 
 def main(subNet):
 
+    global verbose
     print("Verbose",verbose)
     global exitFlag
     signal.signal(signal.SIGINT, handler)
